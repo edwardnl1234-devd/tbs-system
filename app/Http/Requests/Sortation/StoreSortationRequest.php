@@ -1,0 +1,30 @@
+<?php
+
+namespace App\Http\Requests\Sortation;
+
+use Illuminate\Foundation\Http\FormRequest;
+
+class StoreSortationRequest extends FormRequest
+{
+    public function authorize(): bool
+    {
+        return true;
+    }
+
+    public function rules(): array
+    {
+        return [
+            'weighing_id' => 'required|exists:weighings,id|unique:sortations,weighing_id',
+            'good_quality_weight' => 'nullable|numeric|min:0',
+            'medium_quality_weight' => 'nullable|numeric|min:0',
+            'poor_quality_weight' => 'nullable|numeric|min:0',
+            'reject_weight' => 'nullable|numeric|min:0',
+            'assistant_deduction' => 'nullable|numeric|min:0',
+            'deduction_reason' => 'nullable|string',
+            'final_accepted_weight' => 'required|numeric|min:0',
+            'mandor_score' => 'nullable|integer|min:0|max:100',
+            'operator_discipline_score' => 'nullable|integer|min:0|max:100',
+            'notes' => 'nullable|string',
+        ];
+    }
+}
