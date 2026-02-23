@@ -11,7 +11,7 @@ return new class extends Migration
         Schema::create('stock_opnames', function (Blueprint $table) {
             $table->bigIncrements('id');
             $table->date('opname_date');
-            $table->enum('product_type', ['CPO', 'Kernel', 'Shell', 'TBS']);
+            $table->string('product_type', 30);
             $table->string('location', 100)->nullable();
             $table->decimal('physical_quantity', 10, 2);
             $table->decimal('system_quantity', 10, 2);
@@ -20,7 +20,7 @@ return new class extends Migration
             $table->foreignId('counted_by')->constrained('users')->restrictOnDelete();
             $table->foreignId('verified_by')->nullable()->constrained('users')->nullOnDelete();
             $table->text('remarks')->nullable();
-            $table->enum('status', ['draft', 'verified', 'approved'])->default('draft');
+            $table->string('status', 20)->default('draft');
             $table->timestamps();
             
             $table->index(['opname_date', 'product_type']);

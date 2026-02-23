@@ -18,17 +18,11 @@ return new class extends Migration
      */
     public function up(): void
     {
-        // Step 1: Expand enum to include all values (old + new)
-        DB::statement("ALTER TABLE users MODIFY COLUMN role ENUM(
-            'owner', 'admin', 'manager', 'accounting', 'finance', 
-            'supervisor', 'operator', 'staff', 'mandor', 'operator_timbangan'
-        ) DEFAULT 'operator_timbangan'");
-        
-        // Step 2: Map old roles to new roles
-        // owner -> admin (owner tidak ada lagi)
+        // Map old roles to new roles (role column is now VARCHAR)
+        // owner -> admin
         DB::table('users')->where('role', 'owner')->update(['role' => 'admin']);
         
-        // finance -> accounting (digabung)
+        // finance -> accounting
         DB::table('users')->where('role', 'finance')->update(['role' => 'accounting']);
         
         // supervisor -> manager
@@ -39,13 +33,6 @@ return new class extends Migration
         
         // staff -> operator_timbangan
         DB::table('users')->where('role', 'staff')->update(['role' => 'operator_timbangan']);
-        
-        // mandor stays as mandor (no change needed)
-        
-        // Step 3: Restrict to only new roles
-        DB::statement("ALTER TABLE users MODIFY COLUMN role ENUM(
-            'admin', 'manager', 'mandor', 'accounting', 'operator_timbangan'
-        ) DEFAULT 'operator_timbangan'");
     }
 
     /**
@@ -53,10 +40,8 @@ return new class extends Migration
      */
     public function down(): void
     {
-        // Revert to previous enum structure
-        DB::statement("ALTER TABLE users MODIFY COLUMN role ENUM(
-            'owner', 'admin', 'manager', 'accounting', 'finance', 
-            'supervisor', 'operator', 'staff', 'mandor', 'operator_timbangan'
-        ) DEFAULT 'operator_timbangan'");
+        // Revert role mappings
+        DB::table('users')->where('role', 'operator_timbangan')->update(['role' => 'staff']);
+        DB::table('users')->where('role', 'accounting')->update(['role' => 'finance']);
     }
 };

@@ -14,7 +14,7 @@ return new class extends Migration
             $table->decimal('quantity', 10, 2);
             $table->string('quality_grade', 20)->nullable();
             $table->string('location', 100)->nullable();
-            $table->enum('status', ['available', 'sold', 'transit'])->default('available');
+            $table->string('status', 20)->default('available');
             $table->date('stock_date');
             $table->timestamps();
             

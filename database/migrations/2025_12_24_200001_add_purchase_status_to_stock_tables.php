@@ -11,17 +11,17 @@ return new class extends Migration
     {
         // Update stock_cpo status enum to include purchase statuses
         Schema::table('stock_cpo', function (Blueprint $table) {
-            $table->enum('purchase_status', ['pending', 'in_process', 'done'])->default('pending')->after('status');
+            $table->string('purchase_status', 20)->default('pending')->after('status');
         });
 
         // Update stock_kernel status enum to include purchase statuses
         Schema::table('stock_kernel', function (Blueprint $table) {
-            $table->enum('purchase_status', ['pending', 'in_process', 'done'])->default('pending')->after('status');
+            $table->string('purchase_status', 20)->default('pending')->after('status');
         });
 
         // Update stock_shell status enum to include purchase statuses
         Schema::table('stock_shell', function (Blueprint $table) {
-            $table->enum('purchase_status', ['pending', 'in_process', 'done'])->default('pending')->after('status');
+            $table->string('purchase_status', 20)->default('pending')->after('status');
         });
     }
 

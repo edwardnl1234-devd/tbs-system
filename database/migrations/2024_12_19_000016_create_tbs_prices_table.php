@@ -11,7 +11,7 @@ return new class extends Migration
         Schema::create('tbs_prices', function (Blueprint $table) {
             $table->bigIncrements('id');
             $table->date('effective_date');
-            $table->enum('supplier_type', ['inti', 'plasma', 'umum'])->default('umum');
+            $table->string('supplier_type', 20)->default('umum');
             $table->decimal('price_per_kg', 10, 2);
             $table->text('notes')->nullable();
             $table->timestamps();

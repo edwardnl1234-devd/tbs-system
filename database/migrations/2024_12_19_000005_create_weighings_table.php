@@ -20,7 +20,7 @@ return new class extends Migration
             $table->decimal('total_price', 15, 2)->nullable();
             $table->dateTime('weigh_in_time')->nullable();
             $table->dateTime('weigh_out_time')->nullable();
-            $table->enum('status', ['pending', 'weigh_in', 'weigh_out', 'completed'])->default('pending');
+            $table->string('status', 20)->default('pending');
             $table->text('notes')->nullable();
             $table->timestamps();
             

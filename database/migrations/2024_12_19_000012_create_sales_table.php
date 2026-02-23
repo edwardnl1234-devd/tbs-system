@@ -12,7 +12,7 @@ return new class extends Migration
             $table->bigIncrements('id');
             $table->foreignId('customer_id')->constrained('customers')->cascadeOnDelete();
             $table->string('so_number', 50)->unique();
-            $table->enum('product_type', ['CPO', 'Kernel', 'Shell', 'Empty_Bunch']);
+            $table->string('product_type', 30);
             $table->decimal('quantity', 10, 2);
             $table->decimal('price_per_kg', 10, 2);
             $table->decimal('total_amount', 15, 2);
@@ -20,7 +20,7 @@ return new class extends Migration
             $table->date('delivery_date')->nullable();
             $table->string('truck_plate', 20)->nullable();
             $table->string('driver_name', 100)->nullable();
-            $table->enum('status', ['pending', 'delivered', 'completed', 'cancelled'])->default('pending');
+            $table->string('status', 20)->default('pending');
             $table->text('notes')->nullable();
             $table->timestamps();
             

@@ -12,11 +12,11 @@ return new class extends Migration
             $table->bigIncrements('id');
             $table->string('code', 50)->unique();
             $table->string('name', 200);
-            $table->enum('type', ['inti', 'plasma', 'umum'])->default('umum');
+            $table->string('type', 20)->default('umum');
             $table->string('contact_person', 100)->nullable();
             $table->string('phone', 20)->nullable();
             $table->text('address')->nullable();
-            $table->enum('status', ['active', 'inactive'])->default('active');
+            $table->string('status', 20)->default('active');
             $table->timestamps();
             
             $table->index('type');

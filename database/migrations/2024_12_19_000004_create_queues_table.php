@@ -13,12 +13,12 @@ return new class extends Migration
             $table->foreignId('truck_id')->constrained('trucks')->cascadeOnDelete();
             $table->foreignId('supplier_id')->nullable()->constrained('suppliers')->nullOnDelete();
             $table->string('queue_number', 20)->unique();
-            $table->enum('supplier_type', ['inti', 'plasma', 'umum'])->default('umum');
+            $table->string('supplier_type', 20)->default('umum');
             $table->tinyInteger('bank')->nullable();
             $table->dateTime('arrival_time');
             $table->dateTime('call_time')->nullable();
             $table->dateTime('estimated_call_time')->nullable();
-            $table->enum('status', ['waiting', 'processing', 'completed', 'cancelled'])->default('waiting');
+            $table->string('status', 20)->default('waiting');
             $table->tinyInteger('priority')->default(0);
             $table->text('notes')->nullable();
             $table->timestamps();

@@ -13,7 +13,7 @@ return new class extends Migration
             $table->foreignId('production_id')->nullable()->constrained('productions')->nullOnDelete();
             $table->decimal('quantity', 10, 2);
             $table->string('location', 100)->nullable();
-            $table->enum('status', ['available', 'sold'])->default('available');
+            $table->string('status', 20)->default('available');
             $table->date('stock_date');
             $table->timestamps();
             

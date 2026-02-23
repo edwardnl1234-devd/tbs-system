@@ -20,9 +20,9 @@ return new class extends Migration
             $table->decimal('cpo_extraction_rate', 5, 2)->nullable();
             $table->decimal('kernel_extraction_rate', 5, 2)->nullable();
             $table->date('production_date');
-            $table->enum('shift', ['pagi', 'siang', 'malam', null])->nullable();
+            $table->string('shift', 20)->nullable();
             $table->string('batch_number', 50)->nullable();
-            $table->enum('status', ['processing', 'completed', 'quality_check'])->default('processing');
+            $table->string('status', 20)->default('processing');
             $table->text('notes')->nullable();
             $table->timestamps();
             

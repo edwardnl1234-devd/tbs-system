@@ -15,7 +15,7 @@ return new class extends Migration
             $table->string('driver_phone', 20)->nullable();
             $table->decimal('capacity', 10, 2)->nullable();
             $table->string('type', 50)->nullable();
-            $table->enum('status', ['active', 'inactive'])->default('active');
+            $table->string('status', 20)->default('active');
             $table->timestamps();
             
             $table->index('status');

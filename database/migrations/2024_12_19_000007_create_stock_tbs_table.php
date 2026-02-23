@@ -13,8 +13,8 @@ return new class extends Migration
             $table->foreignId('weighing_id')->nullable()->constrained('weighings')->nullOnDelete();
             $table->foreignId('sortation_id')->nullable()->constrained('sortations')->nullOnDelete();
             $table->decimal('quantity', 10, 2);
-            $table->enum('quality_grade', ['A', 'B', 'C', null])->nullable();
-            $table->enum('status', ['ready', 'processing', 'processed'])->default('ready');
+            $table->string('quality_grade', 20)->nullable();
+            $table->string('status', 20)->default('ready');
             $table->string('location', 100)->nullable();
             $table->date('received_date');
             $table->date('processed_date')->nullable();

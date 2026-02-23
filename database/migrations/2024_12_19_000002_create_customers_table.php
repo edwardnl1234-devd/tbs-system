@@ -17,7 +17,7 @@ return new class extends Migration
             $table->string('email', 100)->nullable();
             $table->text('address')->nullable();
             $table->json('product_types')->nullable();
-            $table->enum('status', ['active', 'inactive'])->default('active');
+            $table->string('status', 20)->default('active');
             $table->timestamps();
             
             $table->index('status');
