@@ -18,11 +18,11 @@ class CustomerController extends Controller
     {
         $query = Customer::query();
 
-        if ($request->has('status')) {
+        if ($request->filled('status')) {
             $query->where('status', $request->status);
         }
 
-        if ($request->has('search')) {
+        if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('code', 'like', "%{$search}%")
@@ -40,7 +40,35 @@ class CustomerController extends Controller
     public function store(StoreCustomerRequest $request): JsonResponse
     {
         try {
-            $customer = Customer::create($request->validated());
+            $data = $request->validated();
+            
+            // Auto-generate code if not provided
+            if (empty($data['code'])) {
+                $lastCustomer = Customer::where('code', 'like', 'CUST%')
+                    ->orderBy('code', 'desc')
+                    ->first();
+                $nextNumber = $lastCustomer 
+                    ? (int) substr($lastCustomer->code, 4) + 1 
+                    : 1;
+                $data['code'] = 'CUST' . str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
+            }
+            
+            // Handle is_active -> status mapping
+            if (isset($data['is_active'])) {
+                $data['status'] = $data['is_active'] ? 'active' : 'inactive';
+                unset($data['is_active']);
+            }
+            
+            // Handle frontend field mappings
+            // Map 'company' to 'contact_person' if contact_person not provided
+            if (!empty($data['company']) && empty($data['contact_person'])) {
+                $data['contact_person'] = $data['company'];
+            }
+            
+            // Remove fields not in database
+            unset($data['company']);
+            
+            $customer = Customer::create($data);
 
             return $this->created(new CustomerResource($customer), 'Customer created successfully');
         } catch (\Exception $e) {
@@ -70,7 +98,24 @@ class CustomerController extends Controller
                 return $this->notFound('Customer not found');
             }
 
-            $customer->update($request->validated());
+            $data = $request->validated();
+            
+            // Handle is_active -> status mapping
+            if (isset($data['is_active'])) {
+                $data['status'] = $data['is_active'] ? 'active' : 'inactive';
+                unset($data['is_active']);
+            }
+            
+            // Handle frontend field mappings
+            // Map 'company' to 'contact_person' if contact_person not provided
+            if (!empty($data['company']) && empty($data['contact_person'])) {
+                $data['contact_person'] = $data['company'];
+            }
+            
+            // Remove fields not in database
+            unset($data['company']);
+            
+            $customer->update($data);
 
             return $this->success(new CustomerResource($customer), 'Customer updated successfully');
         } catch (\Exception $e) {

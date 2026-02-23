@@ -19,6 +19,7 @@ class CustomerResource extends JsonResource
             'address' => $this->address,
             'product_types' => $this->product_types,
             'status' => $this->status,
+            'is_active' => $this->status === 'active',
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),
         ];

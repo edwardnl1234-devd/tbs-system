@@ -16,10 +16,8 @@ class UpdateQueueRequest extends FormRequest
         return [
             'supplier_id' => 'nullable|exists:suppliers,id',
             'supplier_type' => 'nullable|in:inti,plasma,umum',
-            'bank' => 'nullable|integer|in:1,2',
             'call_time' => 'nullable|date',
             'estimated_call_time' => 'nullable|date',
-            'priority' => 'nullable|integer|min:0|max:10',
             'notes' => 'nullable|string',
         ];
     }

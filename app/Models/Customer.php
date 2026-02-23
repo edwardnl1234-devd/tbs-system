@@ -2,12 +2,13 @@
 
 namespace App\Models;
 
+use App\Traits\LogsActivity;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class Customer extends Model
 {
-    use HasFactory;
+    use HasFactory, LogsActivity;
 
     protected $fillable = [
         'code',
@@ -24,6 +25,13 @@ class Customer extends Model
         'product_types' => 'array',
         'status' => 'string',
     ];
+
+    protected $appends = ['is_active'];
+
+    public function getIsActiveAttribute(): bool
+    {
+        return $this->status === 'active';
+    }
 
     public function scopeActive($query)
     {

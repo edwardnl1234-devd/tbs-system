@@ -14,10 +14,9 @@ class UpdateTbsPriceRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'price_date' => 'sometimes|date',
+            'effective_date' => 'sometimes|date',
             'price_per_kg' => 'sometimes|numeric|min:0',
-            'price_type' => 'sometimes|in:H-1,H-2,spot',
-            'quality_grade' => 'nullable|in:A,B,C',
+            'supplier_type' => 'sometimes|in:inti,plasma,umum',
             'notes' => 'nullable|string',
         ];
     }

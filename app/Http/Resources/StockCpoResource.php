@@ -12,7 +12,9 @@ class StockCpoResource extends JsonResource
         return [
             'id' => $this->id,
             'production_id' => $this->production_id,
+            'supplier_id' => $this->supplier_id,
             'quantity' => $this->quantity,
+            'purchase_price' => $this->purchase_price,
             'quality_grade' => $this->quality_grade,
             'tank_number' => $this->tank_number,
             'tank_capacity' => $this->tank_capacity,
@@ -22,8 +24,10 @@ class StockCpoResource extends JsonResource
             'stock_date' => $this->stock_date?->toDateString(),
             'expiry_date' => $this->expiry_date?->toDateString(),
             'status' => $this->status,
+            'purchase_status' => $this->purchase_status,
             'notes' => $this->notes,
             'production' => new ProductionResource($this->whenLoaded('production')),
+            'supplier' => new SupplierResource($this->whenLoaded('supplier')),
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),
         ];

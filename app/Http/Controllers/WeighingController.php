@@ -9,15 +9,17 @@ use App\Http\Requests\Weighing\WeighOutRequest;
 use App\Http\Resources\WeighingResource;
 use App\Models\Queue;
 use App\Models\StockTbs;
+use App\Models\TbsPrice;
 use App\Models\Weighing;
 use App\Traits\ApiResponse;
+use App\Traits\GeneratesTicketNumber;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class WeighingController extends Controller
 {
-    use ApiResponse;
+    use ApiResponse, GeneratesTicketNumber;
 
     public function index(Request $request): JsonResponse
     {
@@ -46,31 +48,92 @@ class WeighingController extends Controller
         try {
             DB::beginTransaction();
 
-            // Update queue status to processing
-            $queue = Queue::find($request->queue_id);
-            if ($queue) {
-                $queue->update(['status' => 'processing', 'call_time' => now()]);
+            // Check if queue exists
+            $queue = Queue::with('supplier')->find($request->queue_id);
+            if (!$queue) {
+                return $this->notFound('Queue not found');
             }
 
-            // Generate ticket number: TYYYYMMDDnnn
-            $today = now()->format('Ymd');
-            $lastWeighing = Weighing::whereDate('weigh_in_time', today())
-                ->orderBy('id', 'desc')
-                ->first();
+            // Prevent double processing - check if weighing already exists for this queue
+            $existingWeighing = Weighing::where('queue_id', $request->queue_id)->first();
+            if ($existingWeighing) {
+                return $this->error('Antrian ini sudah ditimbang (Tiket: ' . $existingWeighing->ticket_number . ')', 400);
+            }
 
-            $sequence = $lastWeighing ? (int) substr($lastWeighing->ticket_number, -3) + 1 : 1;
-            $ticketNumber = 'T' . $today . str_pad($sequence, 3, '0', STR_PAD_LEFT);
+            // Check queue status - must be waiting or processing
+            if (!in_array($queue->status, ['waiting', 'processing'])) {
+                return $this->error('Antrian tidak dalam status yang valid untuk ditimbang', 400);
+            }
+
+            // Update queue status to processing
+            $queue->update(['status' => 'processing', 'call_time' => now()]);
+
+            // Get company name from supplier
+            $companyName = $queue->supplier?->name ?? 'Unknown';
+            
+            // Get product type from request (default TBS)
+            $productType = $request->product_type ?? 'TBS';
+            
+            // Extract company code and product code for ticket number
+            $companyCode = $this->extractCompanyCode($companyName);
+            $productCode = $this->getProductTypeCode($productType);
+            $year = now()->format('y');
+
+            // Generate ticket number: NNNN/XX/P/YY
+            // Find the highest sequence number for this company code + product code + year combination
+            // to avoid duplicate ticket numbers (unique constraint is global, not per day)
+            $maxSequence = Weighing::where('ticket_number', 'like', "%/{$companyCode}/{$productCode}/{$year}")
+                ->get()
+                ->map(function ($weighing) {
+                    $ticket = $weighing->ticket_number;
+                    if (str_contains($ticket, '/')) {
+                        return (int) explode('/', $ticket)[0];
+                    }
+                    return 0;
+                })
+                ->max() ?? 0;
+
+            $sequence = $maxSequence + 1;
+            $ticketNumber = $this->generateTicketNumber($sequence, $companyName, $productType);
+
+            // Netto SELALU dihitung otomatis dari bruto - tara
+            $nettoWeight = null;
+            $status = 'weigh_in';
+            $weighOutTime = null;
+            
+            if ($request->bruto_weight && $request->tara_weight) {
+                // Hitung netto otomatis
+                $nettoWeight = max(0, $request->bruto_weight - $request->tara_weight);
+                $status = 'completed';
+                $weighOutTime = now();
+            }
 
             $weighing = Weighing::create([
                 'queue_id' => $request->queue_id,
                 'operator_id' => auth()->id(),
                 'ticket_number' => $ticketNumber,
+                'product_type' => $productType,
                 'bruto_weight' => $request->bruto_weight,
+                'tara_weight' => $request->tara_weight,
+                'netto_weight' => $nettoWeight,
+                // price_per_kg akan di-set otomatis oleh WeighingObserver jika tidak disediakan
                 'price_per_kg' => $request->price_per_kg,
                 'weigh_in_time' => now(),
-                'status' => 'weigh_in',
+                'weigh_out_time' => $weighOutTime,
+                'status' => $status,
                 'notes' => $request->notes,
             ]);
+
+            // Hitung total_price setelah create (karena price mungkin di-set oleh observer)
+            if ($weighing->netto_weight && $weighing->price_per_kg) {
+                $weighing->total_price = $weighing->netto_weight * $weighing->price_per_kg;
+                $weighing->saveQuietly(); // saveQuietly agar tidak trigger observer lagi
+            }
+
+            // If completed, update queue status
+            if ($status === 'completed') {
+                $queue->update(['status' => 'completed']);
+            }
 
             DB::commit();
 
@@ -106,10 +169,12 @@ class WeighingController extends Controller
 
             $weighing->update($request->validated());
 
-            // Recalculate netto weight and total price if applicable
-            if ($weighing->tara_weight) {
-                $weighing->netto_weight = $weighing->bruto_weight - $weighing->tara_weight;
-                $weighing->total_price = $weighing->netto_weight * $weighing->price_per_kg;
+            // Selalu hitung ulang netto otomatis dari bruto - tara
+            if ($weighing->bruto_weight && $weighing->tara_weight) {
+                $weighing->netto_weight = max(0, $weighing->bruto_weight - $weighing->tara_weight);
+                if ($weighing->price_per_kg) {
+                    $weighing->total_price = $weighing->netto_weight * $weighing->price_per_kg;
+                }
                 $weighing->save();
             }
 
@@ -180,8 +245,9 @@ class WeighingController extends Controller
                 return $this->error('Weigh-in must be completed first', 400);
             }
 
-            $nettoWeight = $weighing->bruto_weight - $request->tara_weight;
-            $totalPrice = $nettoWeight * $weighing->price_per_kg;
+            // Hitung netto otomatis dari bruto - tara
+            $nettoWeight = max(0, $weighing->bruto_weight - $request->tara_weight);
+            $totalPrice = $weighing->price_per_kg ? $nettoWeight * $weighing->price_per_kg : 0;
 
             $weighing->update([
                 'tara_weight' => $request->tara_weight,
@@ -289,5 +355,125 @@ class WeighingController extends Controller
         }
 
         return $this->success(new WeighingResource($weighing));
+    }
+
+    /**
+     * Update derivative weights (CPO, Kernel, Cangkang, Fiber, Jangkos)
+     */
+    public function updateDerivatives(Request $request, int $id): JsonResponse
+    {
+        try {
+            $weighing = Weighing::find($id);
+
+            if (!$weighing) {
+                return $this->notFound('Weighing not found');
+            }
+
+            $validated = $request->validate([
+                'cpo_weight' => 'nullable|numeric|min:0',
+                'kernel_weight' => 'nullable|numeric|min:0',
+                'cangkang_weight' => 'nullable|numeric|min:0',
+                'fiber_weight' => 'nullable|numeric|min:0',
+                'jangkos_weight' => 'nullable|numeric|min:0',
+            ]);
+
+            $weighing->update($validated);
+
+            return $this->success(
+                new WeighingResource($weighing->load(['queue', 'operator'])),
+                'Berat turunan berhasil diperbarui'
+            );
+        } catch (\Exception $e) {
+            return $this->serverError('Gagal memperbarui berat turunan: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Refresh price for a weighing based on current daily price
+     */
+    public function refreshPrice(int $id): JsonResponse
+    {
+        try {
+            $weighing = Weighing::with('queue')->find($id);
+
+            if (!$weighing) {
+                return $this->notFound('Weighing not found');
+            }
+
+            if ($weighing->status === 'completed') {
+                return $this->error('Tidak dapat mengubah harga untuk penimbangan yang sudah selesai', 400);
+            }
+
+            $supplierType = $weighing->queue?->supplier_type ?? 'umum';
+            $newPrice = TbsPrice::getPriceForDate($supplierType);
+
+            if (!$newPrice) {
+                return $this->error('Harga untuk tipe supplier "' . $supplierType . '" belum diatur', 404);
+            }
+
+            $oldPrice = $weighing->price_per_kg;
+            $weighing->price_per_kg = $newPrice;
+
+            // Recalculate total if netto exists
+            if ($weighing->netto_weight) {
+                $weighing->total_price = $weighing->netto_weight * $newPrice;
+            }
+
+            $weighing->save();
+
+            return $this->success(
+                new WeighingResource($weighing->load(['queue', 'operator'])),
+                'Harga berhasil diperbarui dari Rp ' . number_format($oldPrice ?? 0) . ' ke Rp ' . number_format($newPrice)
+            );
+        } catch (\Exception $e) {
+            return $this->serverError('Gagal memperbarui harga: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Bulk refresh prices for all pending weighings
+     */
+    public function bulkRefreshPrices(): JsonResponse
+    {
+        try {
+            DB::beginTransaction();
+
+            $weighings = Weighing::with('queue')
+                ->where('status', '!=', 'completed')
+                ->get();
+
+            $updated = 0;
+            $failed = 0;
+            $errors = [];
+
+            foreach ($weighings as $weighing) {
+                $supplierType = $weighing->queue?->supplier_type ?? 'umum';
+                $newPrice = TbsPrice::getPriceForDate($supplierType);
+
+                if ($newPrice) {
+                    $weighing->price_per_kg = $newPrice;
+                    if ($weighing->netto_weight) {
+                        $weighing->total_price = $weighing->netto_weight * $newPrice;
+                    }
+                    $weighing->saveQuietly();
+                    $updated++;
+                } else {
+                    $failed++;
+                    $errors[] = "Tiket {$weighing->ticket_number}: Harga tidak ditemukan untuk tipe '{$supplierType}'";
+                }
+            }
+
+            DB::commit();
+
+            return $this->success([
+                'total_processed' => $weighings->count(),
+                'updated' => $updated,
+                'failed' => $failed,
+                'errors' => $errors,
+            ], "Berhasil memperbarui harga untuk {$updated} penimbangan");
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return $this->serverError('Gagal memperbarui harga: ' . $e->getMessage());
+        }
     }
 }

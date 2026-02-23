@@ -23,6 +23,7 @@ class UpdateSupplierRequest extends FormRequest
             'phone' => 'nullable|string|max:20',
             'address' => 'nullable|string',
             'status' => 'sometimes|in:active,inactive',
+            'is_active' => 'nullable|boolean',
         ];
     }
 }

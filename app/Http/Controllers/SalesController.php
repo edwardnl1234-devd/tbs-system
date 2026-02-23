@@ -23,23 +23,23 @@ class SalesController extends Controller
     {
         $query = Sales::with(['customer']);
 
-        if ($request->has('status')) {
+        if ($request->filled('status')) {
             $query->where('status', $request->status);
         }
 
-        if ($request->has('product_type')) {
+        if ($request->filled('product_type')) {
             $query->where('product_type', $request->product_type);
         }
 
-        if ($request->has('customer_id')) {
+        if ($request->filled('customer_id')) {
             $query->where('customer_id', $request->customer_id);
         }
 
-        if ($request->has('date_from')) {
+        if ($request->filled('date_from')) {
             $query->whereDate('order_date', '>=', $request->date_from);
         }
 
-        if ($request->has('date_to')) {
+        if ($request->filled('date_to')) {
             $query->whereDate('order_date', '<=', $request->date_to);
         }
 
@@ -53,6 +53,15 @@ class SalesController extends Controller
     {
         try {
             DB::beginTransaction();
+
+            // Cek ketersediaan stock sebelum membuat penjualan
+            $availableStock = $this->getAvailableStock($request->product_type);
+            if ($availableStock < $request->quantity) {
+                return $this->error(
+                    "Stock {$request->product_type} tidak mencukupi. Tersedia: " . number_format($availableStock, 2) . " kg, Dibutuhkan: " . number_format($request->quantity, 2) . " kg",
+                    400
+                );
+            }
 
             // Generate SO number: SO-YYYYMMDD-NNN
             $today = now()->format('Ymd');
@@ -91,7 +100,34 @@ class SalesController extends Controller
             );
         } catch (\Exception $e) {
             DB::rollBack();
+            \Log::error('Sales creation failed', [
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'request' => $request->all(),
+            ]);
             return $this->serverError('Failed to create sales: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Get available stock quantity for a product type
+     */
+    private function getAvailableStock(string $productType): float
+    {
+        switch ($productType) {
+            case 'CPO':
+                return StockCpo::where('status', 'available')
+                    ->where('movement_type', 'in')
+                    ->sum('quantity');
+            case 'Kernel':
+                return StockKernel::where('status', 'available')
+                    ->sum('quantity');
+            case 'Shell':
+                return StockShell::where('status', 'available')
+                    ->sum('quantity');
+            default:
+                return 0;
         }
     }
 
@@ -138,6 +174,7 @@ class SalesController extends Controller
                         'quantity_sold' => $allocatedQty,
                     ]);
 
+                    $stock->update(['status' => 'reserved']);
                     $remainingQuantity -= $allocatedQty;
                 }
                 break;
@@ -158,10 +195,14 @@ class SalesController extends Controller
                         'quantity_sold' => $allocatedQty,
                     ]);
 
+                    $stock->update(['status' => 'reserved']);
                     $remainingQuantity -= $allocatedQty;
                 }
                 break;
         }
+        
+        // Note: If remainingQuantity > 0, it means not all quantity was reserved from stock
+        // This is OK - penjualan tanpa stok diperbolehkan
     }
 
     public function show(int $id): JsonResponse
@@ -360,33 +401,33 @@ class SalesController extends Controller
 
     public function statistics(Request $request): JsonResponse
     {
-        $startDate = $request->get('start_date', today()->subDays(30)->toDateString());
-        $endDate = $request->get('end_date', today()->toDateString());
+        $today = today();
 
-        $stats = Sales::whereBetween('order_date', [$startDate, $endDate])
-            ->selectRaw('
-                COUNT(*) as total_orders,
-                SUM(quantity) as total_quantity,
-                SUM(total_amount) as total_revenue,
-                AVG(price_per_kg) as avg_price
-            ')
-            ->first();
+        // Count by status
+        $pending = Sales::where('status', 'pending')->count();
+        $delivered = Sales::where('status', 'delivered')->count();
+        $completed = Sales::where('status', 'completed')->count();
 
-        $byProduct = Sales::whereBetween('order_date', [$startDate, $endDate])
-            ->select('product_type', DB::raw('SUM(quantity) as total_quantity'), DB::raw('SUM(total_amount) as total_revenue'))
-            ->groupBy('product_type')
-            ->get();
+        // Revenue calculations
+        $totalRevenue = Sales::sum('total_amount');
+        $todayRevenue = Sales::whereDate('order_date', $today)->sum('total_amount');
+        $monthRevenue = Sales::whereMonth('order_date', $today->month)
+            ->whereYear('order_date', $today->year)
+            ->sum('total_amount');
 
-        $byStatus = Sales::whereBetween('order_date', [$startDate, $endDate])
-            ->select('status', DB::raw('COUNT(*) as count'))
-            ->groupBy('status')
-            ->get();
+        // Additional stats
+        $totalOrders = Sales::count();
+        $totalQuantity = Sales::sum('quantity');
 
         return $this->success([
-            'period' => ['start' => $startDate, 'end' => $endDate],
-            'summary' => $stats,
-            'by_product' => $byProduct,
-            'by_status' => $byStatus,
+            'pending' => $pending,
+            'delivered' => $delivered,
+            'completed' => $completed,
+            'total_revenue' => $totalRevenue,
+            'today_revenue' => $todayRevenue,
+            'month_revenue' => $monthRevenue,
+            'total_orders' => $totalOrders,
+            'total_quantity' => $totalQuantity,
         ]);
     }
 }

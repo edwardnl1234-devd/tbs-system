@@ -31,6 +31,32 @@ class ProductionController extends Controller
             $query->whereDate('production_date', $request->date);
         }
 
+        // Filter by date range
+        if ($request->has('start_date')) {
+            $query->whereDate('production_date', '>=', $request->start_date);
+        }
+        if ($request->has('end_date')) {
+            $query->whereDate('production_date', '<=', $request->end_date);
+        }
+
+        // Filter by period (today, week, month)
+        if ($request->has('period')) {
+            $today = now()->toDateString();
+            switch ($request->period) {
+                case 'today':
+                    $query->whereDate('production_date', $today);
+                    break;
+                case 'week':
+                    $query->whereDate('production_date', '>=', now()->startOfWeek()->toDateString())
+                          ->whereDate('production_date', '<=', $today);
+                    break;
+                case 'month':
+                    $query->whereDate('production_date', '>=', now()->startOfMonth()->toDateString())
+                          ->whereDate('production_date', '<=', $today);
+                    break;
+            }
+        }
+
         if ($request->has('shift')) {
             $query->where('shift', $request->shift);
         }
@@ -50,25 +76,38 @@ class ProductionController extends Controller
             // Generate batch number
             $batchNumber = 'PRD' . now()->format('YmdHis') . str_pad(random_int(1, 999), 3, '0', STR_PAD_LEFT);
 
+            // Calculate extraction rates
+            $tbsInput = $request->tbs_input_weight;
+            $cpoOutput = $request->cpo_output ?? 0;
+            $kernelOutput = $request->kernel_output ?? 0;
+            
+            $cpoExtractionRate = $tbsInput > 0 ? round(($cpoOutput / $tbsInput) * 100, 2) : 0;
+            $kernelExtractionRate = $tbsInput > 0 ? round(($kernelOutput / $tbsInput) * 100, 2) : 0;
+
             $production = Production::create([
                 'stock_tbs_id' => $request->stock_tbs_id,
                 'supervisor_id' => auth()->id(),
-                'tbs_input_weight' => $request->tbs_input_weight,
-                'cpo_output' => $request->cpo_output ?? 0,
-                'kernel_output' => $request->kernel_output ?? 0,
+                'tbs_input_weight' => $tbsInput,
+                'cpo_output' => $cpoOutput,
+                'kernel_output' => $kernelOutput,
                 'shell_output' => $request->shell_output ?? 0,
                 'empty_bunch_output' => $request->empty_bunch_output ?? 0,
+                'cpo_extraction_rate' => $cpoExtractionRate,
+                'kernel_extraction_rate' => $kernelExtractionRate,
                 'production_date' => $request->production_date,
                 'shift' => $request->shift,
                 'batch_number' => $request->batch_number ?? $batchNumber,
-                'status' => 'processing',
+                'status' => 'completed',
                 'notes' => $request->notes,
             ]);
+
+            // Create stock entries immediately since status is completed
+            $this->createStockEntries($production);
 
             // Update TBS stock status if linked
             if ($request->stock_tbs_id) {
                 StockTbs::where('id', $request->stock_tbs_id)
-                    ->update(['status' => 'processing']);
+                    ->update(['status' => 'processed']);
             }
 
             DB::commit();
@@ -153,6 +192,7 @@ class ProductionController extends Controller
             StockKernel::create([
                 'production_id' => $production->id,
                 'quantity' => $production->kernel_output,
+                'stock_type' => 'production',
                 'status' => 'available',
                 'stock_date' => $production->production_date,
             ]);
@@ -163,6 +203,7 @@ class ProductionController extends Controller
             StockShell::create([
                 'production_id' => $production->id,
                 'quantity' => $production->shell_output,
+                'stock_type' => 'production',
                 'status' => 'available',
                 'stock_date' => $production->production_date,
             ]);
@@ -221,26 +262,50 @@ class ProductionController extends Controller
 
     public function statistics(Request $request): JsonResponse
     {
-        $startDate = $request->get('start_date', today()->subDays(30)->toDateString());
-        $endDate = $request->get('end_date', today()->toDateString());
-
-        $stats = Production::whereBetween('production_date', [$startDate, $endDate])
-            ->where('status', 'completed')
-            ->selectRaw('
-                SUM(tbs_input_weight) as total_tbs_input,
-                SUM(cpo_output) as total_cpo_output,
-                SUM(kernel_output) as total_kernel_output,
-                SUM(shell_output) as total_shell_output,
-                SUM(empty_bunch_output) as total_empty_bunch_output,
-                AVG(cpo_extraction_rate) as avg_cpo_extraction_rate,
-                AVG(kernel_extraction_rate) as avg_kernel_extraction_rate,
+        $today = now()->toDateString();
+        $startOfWeek = now()->startOfWeek()->toDateString();
+        $startOfMonth = now()->startOfMonth()->toDateString();
+        
+        // Determine period filter
+        $period = $request->get('period', ''); // '', 'today', 'week', 'month'
+        
+        $query = Production::query();
+        
+        switch ($period) {
+            case 'today':
+                $query->whereDate('production_date', $today);
+                break;
+            case 'week':
+                $query->whereDate('production_date', '>=', $startOfWeek)
+                      ->whereDate('production_date', '<=', $today);
+                break;
+            case 'month':
+                $query->whereDate('production_date', '>=', $startOfMonth)
+                      ->whereDate('production_date', '<=', $today);
+                break;
+            // default: no filter, show all
+        }
+        
+        $stats = $query->selectRaw('
+                COALESCE(SUM(tbs_input_weight), 0) as total_input,
+                COALESCE(SUM(cpo_output), 0) as total_cpo,
+                COALESCE(SUM(kernel_output), 0) as total_kernel,
+                COALESCE(SUM(shell_output), 0) as total_shell,
+                COALESCE(AVG(cpo_extraction_rate), 0) as avg_oer,
+                COALESCE(AVG(kernel_extraction_rate), 0) as avg_ker,
                 COUNT(*) as total_batches
             ')
             ->first();
 
         return $this->success([
-            'period' => ['start' => $startDate, 'end' => $endDate],
-            'statistics' => $stats,
+            'total_input' => $stats->total_input ?? 0,
+            'total_cpo' => $stats->total_cpo ?? 0,
+            'total_kernel' => $stats->total_kernel ?? 0,
+            'total_shell' => $stats->total_shell ?? 0,
+            'avg_oer' => round($stats->avg_oer ?? 0, 2),
+            'avg_ker' => round($stats->avg_ker ?? 0, 2),
+            'total_batches' => $stats->total_batches ?? 0,
+            'period' => $period ?: 'all',
         ]);
     }
 

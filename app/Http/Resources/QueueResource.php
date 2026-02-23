@@ -20,7 +20,6 @@ class QueueResource extends JsonResource
             'call_time' => $this->call_time?->toISOString(),
             'estimated_call_time' => $this->estimated_call_time?->toISOString(),
             'status' => $this->status,
-            'priority' => $this->priority,
             'notes' => $this->notes,
             'truck' => new TruckResource($this->whenLoaded('truck')),
             'supplier' => new SupplierResource($this->whenLoaded('supplier')),

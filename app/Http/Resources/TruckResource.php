@@ -17,6 +17,7 @@ class TruckResource extends JsonResource
             'type' => $this->type,
             'capacity' => $this->capacity,
             'status' => $this->status,
+            'is_active' => $this->status === 'active',
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),
         ];

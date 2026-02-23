@@ -29,7 +29,7 @@
 - **Role-based Access** - Owner, Manager, Supervisor, Operator, Staff, Mandor
 - **Dashboard & Reports** - Real-time statistics, daily/weekly/monthly reports
 - **Polling Endpoints** - Real-time updates for display screens
-- **Price Management** - Daily TBS prices by supplier type
+- **Price Management** - Daily TBS prices by supplier type, auto-price for weighings, online price fetching
 
 ## 🔄 System Flow
 
@@ -200,6 +200,11 @@ Response:
 | GET/POST | /customers | List/Create customers |
 | GET/POST | /tbs-prices | List/Create TBS prices |
 | GET | /tbs-prices/latest | Get latest prices by type |
+| GET | /tbs-prices/today | Get today's prices |
+| GET | /tbs-prices/by-date/{date} | Get prices by date |
+| GET | /tbs-prices/history | Get price history |
+| GET | /tbs-prices/sources | List available online sources |
+| POST | /tbs-prices/fetch-online | Fetch prices from online source (admin) |
 
 #### Queue Management
 | Method | Endpoint | Description |
@@ -218,6 +223,8 @@ Response:
 | POST | /weighings/{id}/weigh-in | Record first weight (bruto) |
 | POST | /weighings/{id}/weigh-out | Record second weight (tara) |
 | POST | /weighings/{id}/complete | Complete weighing |
+| POST | /weighings/{id}/refresh-price | Refresh price from TBS prices |
+| POST | /weighings/bulk-refresh-prices | Bulk refresh pending weighings |
 | GET | /weighings/today | Get today's weighings |
 | GET | /weighings/pending | Get pending weighings |
 

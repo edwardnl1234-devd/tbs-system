@@ -18,15 +18,15 @@ class TruckController extends Controller
     {
         $query = Truck::query();
 
-        if ($request->has('type')) {
+        if ($request->filled('type')) {
             $query->where('type', $request->type);
         }
 
-        if ($request->has('status')) {
+        if ($request->filled('status')) {
             $query->where('status', $request->status);
         }
 
-        if ($request->has('search')) {
+        if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('plate_number', 'like', "%{$search}%")
@@ -42,7 +42,15 @@ class TruckController extends Controller
     public function store(StoreTruckRequest $request): JsonResponse
     {
         try {
-            $truck = Truck::create($request->validated());
+            $data = $request->validated();
+            
+            // Handle is_active -> status mapping
+            if (isset($data['is_active'])) {
+                $data['status'] = $data['is_active'] ? 'active' : 'inactive';
+                unset($data['is_active']);
+            }
+            
+            $truck = Truck::create($data);
 
             return $this->created(new TruckResource($truck), 'Truck created successfully');
         } catch (\Exception $e) {
@@ -72,7 +80,15 @@ class TruckController extends Controller
                 return $this->notFound('Truck not found');
             }
 
-            $truck->update($request->validated());
+            $data = $request->validated();
+            
+            // Handle is_active -> status mapping
+            if (isset($data['is_active'])) {
+                $data['status'] = $data['is_active'] ? 'active' : 'inactive';
+                unset($data['is_active']);
+            }
+            
+            $truck->update($data);
 
             return $this->success(new TruckResource($truck), 'Truck updated successfully');
         } catch (\Exception $e) {

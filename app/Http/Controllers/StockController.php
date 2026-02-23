@@ -121,16 +121,26 @@ class StockController extends Controller
 
     public function summaryCpo(): JsonResponse
     {
+        $fromProduction = StockCpo::where('stock_type', 'production')
+            ->where('status', 'available')
+            ->where('movement_type', 'in')
+            ->sum('quantity');
+            
+        $fromPurchase = StockCpo::where('stock_type', 'purchase')
+            ->where('status', 'available')
+            ->where('movement_type', 'in')
+            ->sum('quantity');
+            
+        $totalOut = StockCpo::where('movement_type', 'out')->sum('quantity');
+        
         $summary = [
-            'total_in' => StockCpo::where('movement_type', 'in')
-                ->where('status', 'available')
-                ->sum('quantity'),
-            'total_out' => StockCpo::where('movement_type', 'out')
-                ->sum('quantity'),
-            'total_available' => StockCpo::where('status', 'available')
+            'total_in' => $fromProduction + $fromPurchase,
+            'total_out' => $totalOut,
+            'total_available' => ($fromProduction + $fromPurchase) - $totalOut,
+            'from_production' => $fromProduction,
+            'from_purchase' => $fromPurchase,
+            'reserved' => StockCpo::where('status', 'reserved')
                 ->where('movement_type', 'in')
-                ->sum('quantity') - StockCpo::where('movement_type', 'out')->sum('quantity'),
-            'total_reserved' => StockCpo::where('status', 'reserved')
                 ->sum('quantity'),
             'by_quality' => StockCpo::where('status', 'available')
                 ->where('movement_type', 'in')
@@ -222,10 +232,21 @@ class StockController extends Controller
 
     public function summaryKernel(): JsonResponse
     {
+        $fromProduction = StockKernel::where('stock_type', 'production')
+            ->where('status', 'available')
+            ->sum('quantity');
+            
+        $fromPurchase = StockKernel::where('stock_type', 'purchase')
+            ->where('status', 'available')
+            ->sum('quantity');
+        
         $summary = [
-            'total_available' => StockKernel::where('status', 'available')->sum('quantity'),
+            'total_available' => $fromProduction + $fromPurchase,
+            'from_production' => $fromProduction,
+            'from_purchase' => $fromPurchase,
             'total_sold' => StockKernel::where('status', 'sold')->sum('quantity'),
             'total_transit' => StockKernel::where('status', 'transit')->sum('quantity'),
+            'reserved' => StockKernel::where('status', 'reserved')->sum('quantity'),
             'by_quality' => StockKernel::where('status', 'available')
                 ->select('quality_grade', DB::raw('SUM(quantity) as total'))
                 ->groupBy('quality_grade')
@@ -267,9 +288,20 @@ class StockController extends Controller
 
     public function summaryShell(): JsonResponse
     {
+        $fromProduction = StockShell::where('stock_type', 'production')
+            ->where('status', 'available')
+            ->sum('quantity');
+            
+        $fromPurchase = StockShell::where('stock_type', 'purchase')
+            ->where('status', 'available')
+            ->sum('quantity');
+        
         $summary = [
-            'total_available' => StockShell::where('status', 'available')->sum('quantity'),
+            'total_available' => $fromProduction + $fromPurchase,
+            'from_production' => $fromProduction,
+            'from_purchase' => $fromPurchase,
             'total_sold' => StockShell::where('status', 'sold')->sum('quantity'),
+            'reserved' => StockShell::where('status', 'reserved')->sum('quantity'),
         ];
 
         return $this->success($summary);

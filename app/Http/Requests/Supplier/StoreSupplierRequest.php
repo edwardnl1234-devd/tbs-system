@@ -14,13 +14,14 @@ class StoreSupplierRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'code' => 'required|string|max:50|unique:suppliers,code',
+            'code' => 'nullable|string|max:50|unique:suppliers,code',
             'name' => 'required|string|max:200',
             'type' => 'required|in:inti,plasma,umum',
             'contact_person' => 'nullable|string|max:100',
             'phone' => 'nullable|string|max:20',
             'address' => 'nullable|string',
             'status' => 'nullable|in:active,inactive',
+            'is_active' => 'nullable|boolean',
         ];
     }
 }

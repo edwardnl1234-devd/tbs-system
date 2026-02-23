@@ -7,14 +7,16 @@ use App\Http\Requests\Queue\UpdateQueueRequest;
 use App\Http\Requests\Queue\UpdateQueueStatusRequest;
 use App\Http\Resources\QueueResource;
 use App\Models\Queue;
+use App\Models\Supplier;
 use App\Traits\ApiResponse;
+use App\Traits\GeneratesTicketNumber;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class QueueController extends Controller
 {
-    use ApiResponse;
+    use ApiResponse, GeneratesTicketNumber;
 
     public function index(Request $request): JsonResponse
     {
@@ -22,10 +24,6 @@ class QueueController extends Controller
 
         if ($request->has('status')) {
             $query->where('status', $request->status);
-        }
-
-        if ($request->has('bank')) {
-            $query->where('bank', $request->bank);
         }
 
         if ($request->has('supplier_type')) {
@@ -36,8 +34,7 @@ class QueueController extends Controller
             $query->whereDate('arrival_time', $request->date);
         }
 
-        $queues = $query->orderBy('priority', 'desc')
-            ->orderBy('arrival_time', 'asc')
+        $queues = $query->orderBy('arrival_time', 'asc')
             ->paginate($request->per_page ?? 15);
 
         return $this->successPaginated($queues);
@@ -48,14 +45,28 @@ class QueueController extends Controller
         try {
             DB::beginTransaction();
 
-            // Generate queue number: QYYYYMMDDnnn
-            $today = now()->format('Ymd');
-            $lastQueue = Queue::whereDate('arrival_time', today())
-                ->orderBy('id', 'desc')
-                ->first();
+            // Get supplier name for queue number generation
+            $supplier = Supplier::find($request->supplier_id);
+            $companyName = $supplier?->name ?? 'Unknown';
+            $companyCode = $this->extractCompanyCode($companyName);
+            $year = now()->format('y');
 
-            $sequence = $lastQueue ? (int) substr($lastQueue->queue_number, -3) + 1 : 1;
-            $queueNumber = 'Q' . $today . str_pad($sequence, 3, '0', STR_PAD_LEFT);
+            // Generate queue number: NNNN/XX/YY
+            // Find the highest sequence number for this supplier code + year combination
+            // to avoid duplicate queue numbers (unique constraint is global, not per day)
+            $maxSequence = Queue::where('queue_number', 'like', "%/{$companyCode}/{$year}")
+                ->get()
+                ->map(function ($queue) {
+                    $number = $queue->queue_number;
+                    if (str_contains($number, '/')) {
+                        return (int) explode('/', $number)[0];
+                    }
+                    return 0;
+                })
+                ->max() ?? 0;
+
+            $sequence = $maxSequence + 1;
+            $queueNumber = $this->generateQueueNumber($sequence, $companyName);
 
             // Calculate estimated process time based on average
             $avgProcessTime = Queue::where('status', 'completed')
@@ -70,18 +81,16 @@ class QueueController extends Controller
                 'supplier_id' => $request->supplier_id,
                 'queue_number' => $queueNumber,
                 'supplier_type' => $request->supplier_type ?? 'umum',
-                'bank' => $request->bank,
-                'arrival_time' => now(),
+                'arrival_time' => now(), // Waktu masuk otomatis dari server
                 'estimated_call_time' => $estimatedTime,
                 'status' => 'waiting',
-                'priority' => $request->priority ?? 0,
                 'notes' => $request->notes,
             ]);
 
             DB::commit();
 
             return $this->created(
-                new QueueResource($queue->load('truck')),
+                new QueueResource($queue->load(['truck', 'supplier'])),
                 'Queue entry created successfully'
             );
         } catch (\Exception $e) {
@@ -166,7 +175,6 @@ class QueueController extends Controller
     {
         $queues = Queue::with(['truck', 'supplier'])
             ->whereIn('status', ['waiting', 'processing'])
-            ->orderBy('priority', 'desc')
             ->orderBy('arrival_time', 'asc')
             ->get();
 
@@ -188,7 +196,6 @@ class QueueController extends Controller
         $queues = Queue::with(['truck', 'supplier'])
             ->where('bank', $bank)
             ->whereIn('status', ['waiting', 'processing'])
-            ->orderBy('priority', 'desc')
             ->orderBy('arrival_time', 'asc')
             ->get();
 

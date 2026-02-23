@@ -14,7 +14,6 @@ class Queue extends Model
         'supplier_id',
         'queue_number',
         'supplier_type',
-        'bank',
         'arrival_time',
         'call_time',
         'estimated_call_time',
@@ -29,7 +28,6 @@ class Queue extends Model
         'estimated_call_time' => 'datetime',
         'status' => 'string',
         'priority' => 'integer',
-        'bank' => 'integer',
         'supplier_type' => 'string',
     ];
 

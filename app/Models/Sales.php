@@ -2,12 +2,21 @@
 
 namespace App\Models;
 
+use App\Traits\LogsActivity;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class Sales extends Model
 {
-    use HasFactory;
+    use HasFactory, LogsActivity;
+
+    /**
+     * Get identifier for activity log
+     */
+    protected function getActivityIdentifier(): string
+    {
+        return "'{$this->so_number}'";
+    }
 
     protected $fillable = [
         'customer_id',

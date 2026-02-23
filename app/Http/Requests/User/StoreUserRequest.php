@@ -8,7 +8,8 @@ class StoreUserRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user() && in_array($this->user()->role, ['owner', 'manager']);
+        // Only admin can create users
+        return $this->user() && $this->user()->role === 'admin';
     }
 
     public function rules(): array
@@ -18,7 +19,7 @@ class StoreUserRequest extends FormRequest
             'email' => 'required|email|unique:users,email',
             'phone' => 'nullable|string|max:20',
             'password' => 'required|string|min:8',
-            'role' => 'required|in:owner,manager,supervisor,operator,staff,mandor',
+            'role' => 'required|in:admin,manager,accounting,finance,operator_timbangan',
             'status' => 'nullable|in:active,inactive',
         ];
     }

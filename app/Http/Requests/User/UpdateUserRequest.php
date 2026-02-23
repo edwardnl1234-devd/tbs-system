@@ -9,7 +9,8 @@ class UpdateUserRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user() && in_array($this->user()->role, ['owner', 'manager']);
+        // Only admin can update users
+        return $this->user() && $this->user()->role === 'admin';
     }
 
     public function rules(): array
@@ -19,7 +20,7 @@ class UpdateUserRequest extends FormRequest
             'email' => ['sometimes', 'email', Rule::unique('users')->ignore($this->route('user'))],
             'phone' => 'nullable|string|max:20',
             'password' => 'nullable|string|min:8',
-            'role' => 'sometimes|in:owner,manager,supervisor,operator,staff,mandor',
+            'role' => 'sometimes|in:admin,manager,accounting,finance,operator_timbangan',
             'status' => 'sometimes|in:active,inactive',
         ];
     }

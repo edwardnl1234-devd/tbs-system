@@ -11,13 +11,10 @@ class TbsPriceResource extends JsonResource
     {
         return [
             'id' => $this->id,
-            'price_date' => $this->price_date?->toDateString(),
+            'effective_date' => $this->effective_date?->toDateString(),
             'price_per_kg' => $this->price_per_kg,
-            'price_type' => $this->price_type,
-            'quality_grade' => $this->quality_grade,
-            'set_by' => $this->set_by,
+            'supplier_type' => $this->supplier_type,
             'notes' => $this->notes,
-            'setter' => new UserResource($this->whenLoaded('setBy')),
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),
         ];

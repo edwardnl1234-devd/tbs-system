@@ -18,15 +18,15 @@ class SupplierController extends Controller
     {
         $query = Supplier::query();
 
-        if ($request->has('type')) {
+        if ($request->filled('type')) {
             $query->where('type', $request->type);
         }
 
-        if ($request->has('status')) {
+        if ($request->filled('status')) {
             $query->where('status', $request->status);
         }
 
-        if ($request->has('search')) {
+        if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
@@ -43,7 +43,27 @@ class SupplierController extends Controller
     public function store(StoreSupplierRequest $request): JsonResponse
     {
         try {
-            $supplier = Supplier::create($request->validated());
+            $data = $request->validated();
+            
+            // Auto-generate code if not provided
+            if (empty($data['code'])) {
+                $prefix = strtoupper(substr($data['type'] ?? 'SUP', 0, 3));
+                $lastSupplier = Supplier::where('code', 'like', $prefix . '%')
+                    ->orderBy('code', 'desc')
+                    ->first();
+                $nextNumber = $lastSupplier 
+                    ? (int) substr($lastSupplier->code, strlen($prefix)) + 1 
+                    : 1;
+                $data['code'] = $prefix . str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
+            }
+            
+            // Handle is_active -> status mapping
+            if (isset($data['is_active'])) {
+                $data['status'] = $data['is_active'] ? 'active' : 'inactive';
+                unset($data['is_active']);
+            }
+            
+            $supplier = Supplier::create($data);
 
             return $this->created(new SupplierResource($supplier), 'Supplier created successfully');
         } catch (\Exception $e) {
@@ -71,7 +91,15 @@ class SupplierController extends Controller
                 return $this->notFound('Supplier not found');
             }
 
-            $supplier->update($request->validated());
+            $data = $request->validated();
+            
+            // Handle is_active -> status mapping
+            if (isset($data['is_active'])) {
+                $data['status'] = $data['is_active'] ? 'active' : 'inactive';
+                unset($data['is_active']);
+            }
+            
+            $supplier->update($data);
 
             return $this->success(new SupplierResource($supplier), 'Supplier updated successfully');
         } catch (\Exception $e) {

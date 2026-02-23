@@ -12,6 +12,14 @@ class UpdateTruckRequest extends FormRequest
         return true;
     }
 
+    protected function prepareForValidation(): void
+    {
+        // Convert empty strings to null for numeric fields
+        if ($this->capacity === '' || $this->capacity === null) {
+            $this->merge(['capacity' => null]);
+        }
+    }
+
     public function rules(): array
     {
         return [
@@ -21,6 +29,7 @@ class UpdateTruckRequest extends FormRequest
             'type' => 'nullable|string|max:50',
             'capacity' => 'nullable|numeric|min:0',
             'status' => 'sometimes|in:active,inactive',
+            'is_active' => 'nullable|boolean',
         ];
     }
 }

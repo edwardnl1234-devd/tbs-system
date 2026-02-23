@@ -17,8 +17,6 @@ class StoreQueueRequest extends FormRequest
             'truck_id' => 'required|exists:trucks,id',
             'supplier_id' => 'nullable|exists:suppliers,id',
             'supplier_type' => 'nullable|in:inti,plasma,umum',
-            'bank' => 'nullable|integer|in:1,2',
-            'priority' => 'nullable|integer|min:0|max:10',
             'notes' => 'nullable|string',
         ];
     }

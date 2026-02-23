@@ -10,12 +10,12 @@ class UserSeeder extends Seeder
 {
     public function run(): void
     {
-        // Create default admin/owner user
+        // Create admin
         User::create([
             'name' => 'Administrator',
-            'email' => 'admin@tbs-system.local',
+            'email' => 'admin@gmail.com',
             'password' => Hash::make('password'),
-            'role' => 'owner',
+            'role' => 'admin',
             'status' => 'active',
             'email_verified_at' => now(),
         ]);
@@ -23,39 +23,19 @@ class UserSeeder extends Seeder
         // Create manager
         User::create([
             'name' => 'Manager PKS',
-            'email' => 'manager@tbs-system.local',
+            'email' => 'manager@gmail.com',
             'password' => Hash::make('password'),
             'role' => 'manager',
             'status' => 'active',
             'email_verified_at' => now(),
         ]);
 
-        // Create supervisor
+        // Create accounting
         User::create([
-            'name' => 'Supervisor Produksi',
-            'email' => 'supervisor@tbs-system.local',
+            'name' => 'Accounting',
+            'email' => 'accounting@gmail.com',
             'password' => Hash::make('password'),
-            'role' => 'supervisor',
-            'status' => 'active',
-            'email_verified_at' => now(),
-        ]);
-
-        // Create operator
-        User::create([
-            'name' => 'Operator Timbangan',
-            'email' => 'operator@tbs-system.local',
-            'password' => Hash::make('password'),
-            'role' => 'operator',
-            'status' => 'active',
-            'email_verified_at' => now(),
-        ]);
-
-        // Create staff
-        User::create([
-            'name' => 'Staff Administrasi',
-            'email' => 'staff@tbs-system.local',
-            'password' => Hash::make('password'),
-            'role' => 'staff',
+            'role' => 'accounting',
             'status' => 'active',
             'email_verified_at' => now(),
         ]);
@@ -63,7 +43,7 @@ class UserSeeder extends Seeder
         // Create mandor
         User::create([
             'name' => 'Mandor Sortasi',
-            'email' => 'mandor@tbs-system.local',
+            'email' => 'mandor@gmail.com',
             'password' => Hash::make('password'),
             'role' => 'mandor',
             'status' => 'active',

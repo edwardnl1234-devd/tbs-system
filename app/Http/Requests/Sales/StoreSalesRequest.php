@@ -25,4 +25,22 @@ class StoreSalesRequest extends FormRequest
             'notes' => 'nullable|string',
         ];
     }
+
+    public function messages(): array
+    {
+        return [
+            'customer_id.required' => 'Customer wajib dipilih',
+            'customer_id.exists' => 'Customer tidak ditemukan',
+            'product_type.required' => 'Jenis produk wajib dipilih',
+            'product_type.in' => 'Jenis produk tidak valid',
+            'quantity.required' => 'Jumlah wajib diisi',
+            'quantity.numeric' => 'Jumlah harus berupa angka',
+            'quantity.min' => 'Jumlah minimal 0.01 kg',
+            'price_per_kg.required' => 'Harga per kg wajib diisi',
+            'price_per_kg.numeric' => 'Harga harus berupa angka',
+            'order_date.required' => 'Tanggal order wajib diisi',
+            'order_date.date' => 'Format tanggal tidak valid',
+            'delivery_date.after_or_equal' => 'Tanggal kirim tidak boleh sebelum tanggal order',
+        ];
+    }
 }

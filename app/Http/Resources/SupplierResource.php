@@ -18,6 +18,7 @@ class SupplierResource extends JsonResource
             'phone' => $this->phone,
             'address' => $this->address,
             'status' => $this->status,
+            'is_active' => $this->status === 'active',
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),
         ];

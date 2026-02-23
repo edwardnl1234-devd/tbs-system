@@ -35,9 +35,9 @@ class User extends Authenticatable
     }
 
     // Role check methods
-    public function isOwner(): bool
+    public function isAdmin(): bool
     {
-        return $this->role === 'owner';
+        return $this->role === 'admin';
     }
 
     public function isManager(): bool
@@ -45,24 +45,45 @@ class User extends Authenticatable
         return $this->role === 'manager';
     }
 
-    public function isSupervisor(): bool
+    public function isAccounting(): bool
     {
-        return $this->role === 'supervisor';
+        return $this->role === 'accounting';
     }
 
-    public function isOperator(): bool
+    public function isFinance(): bool
     {
-        return $this->role === 'operator';
+        return $this->role === 'finance';
     }
 
-    public function isStaff(): bool
+    public function isOperatorTimbangan(): bool
     {
-        return $this->role === 'staff';
+        return $this->role === 'operator_timbangan';
     }
 
-    public function isMandor(): bool
+    /**
+     * Check if user can edit data (only admin can edit)
+     */
+    public function canEdit(): bool
     {
-        return $this->role === 'mandor';
+        return $this->role === 'admin';
+    }
+
+    /**
+     * Check if user can add data
+     * Admin, Accounting, Finance, Operator Timbangan can add
+     * Manager can only view
+     */
+    public function canAdd(): bool
+    {
+        return in_array($this->role, ['admin', 'accounting', 'finance', 'operator_timbangan']);
+    }
+
+    /**
+     * Check if user can view financial data (purchases/sales)
+     */
+    public function canViewFinancial(): bool
+    {
+        return in_array($this->role, ['admin', 'manager', 'accounting', 'finance']);
     }
 
     public function hasRole(array $roles): bool

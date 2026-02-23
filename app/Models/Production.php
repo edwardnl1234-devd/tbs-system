@@ -2,12 +2,21 @@
 
 namespace App\Models;
 
+use App\Traits\LogsActivity;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class Production extends Model
 {
-    use HasFactory;
+    use HasFactory, LogsActivity;
+
+    /**
+     * Get identifier for activity log
+     */
+    protected function getActivityIdentifier(): string
+    {
+        return "Batch '{$this->batch_number}'";
+    }
 
     protected $fillable = [
         'stock_tbs_id',

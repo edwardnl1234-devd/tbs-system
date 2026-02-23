@@ -14,9 +14,10 @@ class UpdateWeighingRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'bruto_weight' => 'sometimes|numeric|min:0',
+            'bruto_weight' => 'nullable|numeric|min:0',
             'tara_weight' => 'nullable|numeric|min:0',
-            'price_per_kg' => 'sometimes|numeric|min:0',
+            'netto_weight' => 'nullable|numeric|min:0',
+            'price_per_kg' => 'nullable|numeric|min:0',
             'notes' => 'nullable|string',
         ];
     }

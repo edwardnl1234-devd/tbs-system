@@ -2,12 +2,13 @@
 
 namespace App\Models;
 
+use App\Traits\LogsActivity;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class Truck extends Model
 {
-    use HasFactory;
+    use HasFactory, LogsActivity;
 
     protected $fillable = [
         'plate_number',
@@ -23,6 +24,13 @@ class Truck extends Model
         'capacity' => 'decimal:2',
         'status' => 'string',
     ];
+
+    protected $appends = ['is_active'];
+
+    public function getIsActiveAttribute(): bool
+    {
+        return $this->status === 'active';
+    }
 
     public function queues()
     {

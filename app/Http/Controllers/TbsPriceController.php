@@ -18,15 +18,15 @@ class TbsPriceController extends Controller
     {
         $query = TbsPrice::query();
 
-        if ($request->has('supplier_type')) {
+        if ($request->filled('supplier_type')) {
             $query->where('supplier_type', $request->supplier_type);
         }
 
-        if ($request->has('date_from')) {
+        if ($request->filled('date_from')) {
             $query->whereDate('effective_date', '>=', $request->date_from);
         }
 
-        if ($request->has('date_to')) {
+        if ($request->filled('date_to')) {
             $query->whereDate('effective_date', '<=', $request->date_to);
         }
 
@@ -182,5 +182,105 @@ class TbsPriceController extends Controller
             });
 
         return $this->success($prices);
+    }
+
+    /**
+     * Fetch harga dari sumber online
+     */
+    public function fetchOnline(Request $request): JsonResponse
+    {
+        try {
+            $source = $request->get('source', config('tbs.price_source.default', 'disbun'));
+            $province = $request->get('province', config('tbs.price_source.province', 'riau'));
+            $save = $request->boolean('save', false);
+
+            $priceService = app(\App\Services\TbsPriceService::class);
+
+            // Jika source = simulate, gunakan harga simulasi
+            if ($source === 'simulate') {
+                $priceData = $priceService->simulatePrice();
+            } else {
+                $priceData = $priceService->fetchOnlinePrice($source, $province);
+            }
+
+            if (!$priceData) {
+                return $this->error('Gagal mengambil harga dari sumber online. Pastikan URL API sudah dikonfigurasi.', 503);
+            }
+
+            // Simpan ke database jika diminta
+            if ($save) {
+                foreach ($priceData['prices'] as $type => $price) {
+                    if ($price) {
+                        TbsPrice::updateOrCreate(
+                            [
+                                'effective_date' => $priceData['effective_date'],
+                                'supplier_type' => $type,
+                            ],
+                            [
+                                'price_per_kg' => $price,
+                                'notes' => 'Fetched from ' . $source . ' on ' . now()->format('Y-m-d H:i:s'),
+                            ]
+                        );
+                    }
+                }
+                $priceData['saved'] = true;
+            }
+
+            return $this->success($priceData, 'Harga berhasil diambil dari ' . $source);
+        } catch (\Exception $e) {
+            return $this->serverError('Gagal mengambil harga: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Get available price sources
+     */
+    public function sources(): JsonResponse
+    {
+        $sources = [
+            [
+                'id' => 'manual',
+                'name' => 'Input Manual',
+                'description' => 'Input harga secara manual',
+                'available' => true,
+            ],
+            [
+                'id' => 'disbun',
+                'name' => 'Dinas Perkebunan',
+                'description' => 'Harga dari Dinas Perkebunan Provinsi',
+                'available' => !empty(config('tbs.price_source.disbun_url')),
+                'provinces' => ['riau', 'sumut', 'kaltim', 'kalbar', 'jambi'],
+            ],
+            [
+                'id' => 'ptpn',
+                'name' => 'PTPN',
+                'description' => 'Harga dari PTPN',
+                'available' => !empty(config('tbs.price_source.ptpn_url')),
+            ],
+            [
+                'id' => 'gapki',
+                'name' => 'GAPKI',
+                'description' => 'Harga dari Gabungan Pengusaha Kelapa Sawit Indonesia',
+                'available' => !empty(config('tbs.price_source.gapki_url')),
+            ],
+            [
+                'id' => 'custom',
+                'name' => 'Custom API',
+                'description' => 'Harga dari API internal perusahaan',
+                'available' => !empty(config('tbs.price_source.custom_api_url')),
+            ],
+            [
+                'id' => 'simulate',
+                'name' => 'Simulasi',
+                'description' => 'Harga simulasi berdasarkan kalkulasi CPO',
+                'available' => true,
+            ],
+        ];
+
+        return $this->success([
+            'sources' => $sources,
+            'default' => config('tbs.price_source.default', 'manual'),
+            'province' => config('tbs.price_source.province', 'riau'),
+        ]);
     }
 }

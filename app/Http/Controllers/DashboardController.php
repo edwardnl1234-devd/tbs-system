@@ -92,14 +92,34 @@ class DashboardController extends Controller
                 'reserved' => StockCpo::where('status', 'reserved')
                     ->where('movement_type', 'in')
                     ->sum('quantity'),
+                'from_production' => StockCpo::where('status', 'available')
+                    ->where('movement_type', 'in')
+                    ->where('stock_type', 'production')
+                    ->sum('quantity'),
+                'from_purchase' => StockCpo::where('status', 'available')
+                    ->where('movement_type', 'in')
+                    ->where('stock_type', 'purchase')
+                    ->sum('quantity'),
             ],
             'kernel' => [
                 'available' => StockKernel::where('status', 'available')->sum('quantity'),
                 'sold' => StockKernel::where('status', 'sold')->sum('quantity'),
+                'from_production' => StockKernel::where('status', 'available')
+                    ->where('stock_type', 'production')
+                    ->sum('quantity'),
+                'from_purchase' => StockKernel::where('status', 'available')
+                    ->where('stock_type', 'purchase')
+                    ->sum('quantity'),
             ],
             'shell' => [
                 'available' => StockShell::where('status', 'available')->sum('quantity'),
                 'sold' => StockShell::where('status', 'sold')->sum('quantity'),
+                'from_production' => StockShell::where('status', 'available')
+                    ->where('stock_type', 'production')
+                    ->sum('quantity'),
+                'from_purchase' => StockShell::where('status', 'available')
+                    ->where('stock_type', 'purchase')
+                    ->sum('quantity'),
             ],
         ];
     }
@@ -115,11 +135,13 @@ class DashboardController extends Controller
 
         return [
             'pending' => Sales::where('status', 'pending')->count(),
-            'delivered' => Sales::whereDate('delivery_date', $today)->where('status', 'delivered')->count(),
+            'delivered' => Sales::where('status', 'delivered')->count(),
+            'completed' => Sales::where('status', 'completed')->count(),
             'today_revenue' => Sales::whereDate('order_date', $today)->sum('total_amount'),
+            'total_revenue' => Sales::sum('total_amount'),
+            'total_transactions' => Sales::whereDate('order_date', $today)->count(),
             'month_revenue' => Sales::whereMonth('order_date', $today->month)
                 ->whereYear('order_date', $today->year)
-                ->where('status', 'completed')
                 ->sum('total_amount'),
         ];
     }
@@ -171,26 +193,31 @@ class DashboardController extends Controller
 
         $production = Production::whereBetween('production_date', [$startDate, $endDate])
             ->selectRaw('
-                SUM(tbs_processed) as total_input,
-                SUM(cpo_produced) as total_cpo,
-                SUM(kernel_produced) as total_kernel,
-                SUM(shell_produced) as total_shell,
-                AVG(oer) as avg_oer,
-                AVG(ker) as avg_ker
+                SUM(tbs_input_weight) as total_input,
+                SUM(cpo_output) as total_cpo,
+                SUM(kernel_output) as total_kernel,
+                SUM(shell_output) as total_shell,
+                AVG(cpo_extraction_rate) as avg_oer,
+                AVG(kernel_extraction_rate) as avg_ker
             ')
             ->first();
 
-        $totalOutput = $production->total_cpo + $production->total_kernel + $production->total_shell;
-        $overallEfficiency = $production->total_input > 0 
-            ? ($totalOutput / $production->total_input) * 100 
+        $totalInput = $production->total_input ?? 0;
+        $totalCpo = $production->total_cpo ?? 0;
+        $totalKernel = $production->total_kernel ?? 0;
+        $totalShell = $production->total_shell ?? 0;
+        
+        $totalOutput = $totalCpo + $totalKernel + $totalShell;
+        $overallEfficiency = $totalInput > 0 
+            ? ($totalOutput / $totalInput) * 100 
             : 0;
 
         return $this->success([
             'period' => ['start' => $startDate, 'end' => $endDate],
-            'total_input_kg' => $production->total_input ?? 0,
-            'total_cpo_kg' => $production->total_cpo ?? 0,
-            'total_kernel_kg' => $production->total_kernel ?? 0,
-            'total_shell_kg' => $production->total_shell ?? 0,
+            'total_input_kg' => $totalInput,
+            'total_cpo_kg' => $totalCpo,
+            'total_kernel_kg' => $totalKernel,
+            'total_shell_kg' => $totalShell,
             'avg_oer' => round($production->avg_oer ?? 0, 2),
             'avg_ker' => round($production->avg_ker ?? 0, 2),
             'overall_efficiency' => round($overallEfficiency, 2),
